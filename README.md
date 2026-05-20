@@ -22,8 +22,12 @@ pip install -r requirements.txt
 python main.py
 ```
 
-`settings.json → simulation_mode: true` runs without hardware. For real
-scans, start the wavemeter server on the lab PC first (see below).
+A fresh checkout boots in **simulation mode** (`settings.json →
+simulation_mode: true`) so the GUI runs end-to-end with no wavemeter
+server, no TimeTagger card, no network. A loud terminal + yellow GUI
+banner make synthetic data impossible to mistake for a real scan. For an
+actual run, flip `simulation_mode` to `false` and start the wavemeter
+server on the lab PC first (see below).
 
 ### 1. Start the wavemeter server
 

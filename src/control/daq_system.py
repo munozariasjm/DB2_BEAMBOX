@@ -41,14 +41,15 @@ class DAQSystem:
             "wm_averaging_samples": wm_block.get("wm_averaging_samples", 5),
         })
 
-        # Safe-by-default: a missing `simulation_mode` key means real
-        # hardware. The opposite default (True) silently puts the rig into
-        # simulation on a fresh install or after a typo, which has caused
-        # confusion before. Flag the absence loudly so the operator knows.
+        # Sim-by-default. A missing `simulation_mode` key boots in
+        # simulation so a fresh checkout (or a typo'd settings file) does
+        # not try to talk to a wavemeter server / TimeTagger card that
+        # isn't there. The loud terminal + GUI banners below make it
+        # impossible to confuse simulated data with real data.
         if "simulation_mode" not in self.config:
-            print("[DAQ] WARNING: 'simulation_mode' key missing from settings.json — "
-                  "defaulting to REAL HARDWARE. Add the key explicitly to silence this.")
-        simulation_mode = bool(self.config.get("simulation_mode", False))
+            print("[DAQ] NOTE: 'simulation_mode' key missing from settings.json — "
+                  "defaulting to SIMULATION. Set it explicitly to silence this.")
+        simulation_mode = bool(self.config.get("simulation_mode", True))
         self.simulation_mode = simulation_mode
         if simulation_mode:
             # Loud terminal banner so it is impossible to miss when scrolling
@@ -62,7 +63,7 @@ class DAQSystem:
                 "║                                                              ║\n"
                 "║   All tagger events, wavemeter readings, and PID dynamics    ║\n"
                 "║   are synthetic. Do NOT trust recorded data as physics.      ║\n"
-                "║   Set simulation_mode=false in settings.json for a real run. ║\n"
+                "║   Set simulation_mode=false in settings.json on the lab PC.  ║\n"
                 "║                                                              ║\n"
                 "╚══════════════════════════════════════════════════════════════╝\n"
             )

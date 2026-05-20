@@ -61,5 +61,5 @@
             "continuous": false
         }
     },
-    "simulation_mode": false
+    "simulation_mode": true
 }

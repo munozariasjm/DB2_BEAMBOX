@@ -75,9 +75,13 @@ class SettingsManager:
                 "continuous": False
             }
         },
-        # Safe-by-default. A fresh settings.json gets real hardware; the
-        # operator has to flip this to true explicitly to use simulation.
-        "simulation_mode": False
+        # Sim-by-default. A fresh checkout boots without needing the
+        # wavemeter server or the TimeTagger card present — flip this to
+        # false in settings.json on the actual DAQ host. The loud terminal
+        # + GUI banners make it impossible to mistake simulated data for
+        # real data, so the conservative-real-default rationale no longer
+        # applies.
+        "simulation_mode": True
     }
 
     def __init__(self, config_path: str = "settings.json"):
