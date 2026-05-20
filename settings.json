@@ -1,0 +1,65 @@
+{
+    "scan_settings": {
+        "start_wn": 12624.91,
+        "end_wn": 12624.88,
+        "step_size": 1e-06,
+        "stop_mode": "time",
+        "stop_val": 8.0,
+        "loops": 3,
+        "min_wn": 12625.18,
+        "max_wn": 12625.21
+    },
+    "gui_settings": {
+        "window_width": 1200,
+        "window_height": 800,
+        "refresh_rate_ms": 100,
+        "integration_time_s": 0.1,
+        "rate_avg_enabled": false,
+        "rate_avg_window_s": 0.5
+    },
+    "data_settings": {
+        "default_save_dir": "data",
+        "auto_save": true,
+        "save_continuously": true
+    },
+    "hardware_settings": {
+        "tagger": {
+            "input_mode": "TTL",
+            "channel_starts_us": 1.0,
+            "channel_stops_us": 10.0
+        }
+    },
+    "wavemeter_server": {
+        "host": "10.54.6.156",
+        "port": 5000,
+        "channel": 1,
+        "tolerance_wn": 1e-5,
+        "poll_interval": 0.1,
+        "required_stable_samples": 4,
+        "wm_averaging_samples": 5
+    },
+    "simulation_settings": {
+        "tagger": {
+            "repetition_rate": 500.0,
+            "mean_events_per_bunch": 10.0
+        },
+        "wavemeter": {
+            "slew_rate_nm_per_s": 0.05,
+            "noise_nm": 1e-7,
+            "initial_nm": 791.96
+        }
+    },
+    "control_settings": {
+        "laser_pid": {
+            "kp": 1.0,
+            "ki": 0.0,
+            "kd": 0.0,
+            "vLow": -5.0,
+            "vHigh": 5.0,
+            "gain": 10.0,
+            "offset": 0.0,
+            "continuous": false
+        }
+    },
+    "simulation_mode": false
+}

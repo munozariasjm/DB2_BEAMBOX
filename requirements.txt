@@ -1,0 +1,11 @@
+# Runtime dependencies for the DAQ host.
+#
+# The TimeTagger card needs the ISOLDE-provided `TimeTaggerDriver_isolde`
+# Python package, which is NOT on PyPI — it ships with the card's driver
+# bundle. `src/devices/tagger.py` imports it; if missing, only simulation
+# mode works (a warning is printed at startup).
+
+numpy
+pandas
+PyQt5
+pyqtgraph

@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Scan output — generated per run, do not commit
+data/*.csv
+data/*_meta.json
+
+# Editor / agent state
+.claude/
+.vscode/
+.idea/
+*.swp
