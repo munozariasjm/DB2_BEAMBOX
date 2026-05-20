@@ -1,10 +1,10 @@
 """Wavemeter socket server with built-in per-channel PID.
 
-This file is a copy of `new_manuals/laser_server/wmServer.py` from the
-collaborators, extended with a small command protocol so the DAQ can push
+This file is a copy of `new_manuals/laser_server/wmServer.py`,
+extended with a small command protocol so the DAQ can push
 PID parameters and toggle PID/read state from the GUI. The hardware
 interfaces (Bristol SCPI wavemeter, mcculw analog out) and the PID engine
-itself are unchanged — only `SocketServer.handle_client` learned new verbs.
+itself are unchanged — only `SocketServer.handle_client`.
 
 Wire protocol (newline-terminated ASCII, one command per line):
 
@@ -351,10 +351,9 @@ class SocketServer:
             # buffered behaviour just works.
             reply = self._dispatch(command)
             conn.sendall(reply.encode())
-          # Legacy: the original collaborator client sends `GET` without a
+          # Legacy: the original client sends `GET` without a
           # trailing newline and reads until it sees one. Support that by
           # treating a fully-buffered command without `\n` as a single line
-          # *only* when it looks like the bare token "GET".
           stripped = buf.strip()
           if stripped == b"GET":
             reply = self._dispatch(stripped.decode())
