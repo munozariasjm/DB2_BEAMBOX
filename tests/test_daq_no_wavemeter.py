@@ -113,7 +113,11 @@ def test_unreachable_server_falls_back_to_null_client(monkeypatch):
 
 
 def test_real_client_kept_when_probe_succeeds(monkeypatch):
-    """Sanity-check the happy path: probe succeeds → real client retained."""
+    """Sanity-check the happy path: probe succeeds → real client retained.
+
+    We stub both the fast TCP smoke test (`socket.create_connection`) and
+    the WavemeterClient itself so the test doesn't need a live wmServer.
+    """
 
     class _OkClient:
         def __init__(self, host, port, channel=1, timeout=2.0):
@@ -130,6 +134,13 @@ def test_real_client_kept_when_probe_succeeds(monkeypatch):
         def close(self):
             pass
 
+    class _FakeSock:
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+        def close(self): pass
+
+    monkeypatch.setattr(daq_module.socket, "create_connection",
+                        lambda *a, **k: _FakeSock())
     monkeypatch.setattr(daq_module, "WavemeterClient", _OkClient)
 
     daq = daq_module.DAQSystem(config=_base_config())

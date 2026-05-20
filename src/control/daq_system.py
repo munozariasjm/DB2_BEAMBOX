@@ -1,5 +1,6 @@
 import sys
 import os
+import socket
 import time
 import threading
 import numpy as np
@@ -351,13 +352,18 @@ class DAQSystem:
           1. `wavemeter_server.enabled` is explicitly false → install a
              NullWavemeterClient. Lets the operator bring up the tagger
              side of the rig before the wmServer is online.
-          2. Real client constructs and the startup probe (`enable_read`)
-             succeeds → keep the real client, mark connected.
-          3. Real client constructs but the probe fails (server down,
-             unreachable, refusing connections) → log a loud banner and
-             fall back to NullWavemeterClient so the DAQ loop doesn't
-             stall on per-iteration socket timeouts. Restart once the
+          2. Fast TCP probe (0.5 s) succeeds → construct the real client,
+             call `enable_read` to put the configured channel into the
+             server's active set, keep it.
+          3. Probe or enable_read fails → log a loud banner and install
+             NullWavemeterClient so the DAQ loop and the GUI poll path
+             don't stall on per-call socket timeouts. Restart once the
              server is up to pick up real readings.
+
+        The 0.5 s fast-fail timeout matters: a fully unreachable host
+        (TCP timeout, not RST) would otherwise eat ~4 s here through
+        WavemeterClient's 2 s × 2 retry loop. 0.5 s is plenty for a
+        healthy LAN link to the lab subnet.
         """
         host = str(wm_block.get("host", "10.54.6.156"))
         port = int(wm_block.get("port", 5000))
@@ -368,9 +374,16 @@ class DAQSystem:
                 "[DAQ] wavemeter_server.enabled=false — running with "
                 "NullWavemeterClient (no readings, PID commands no-op)."
             )
-            self.wavemeter = NullWavemeterClient(host=host, port=port, channel=self.wavechannel)
-            self.wavemeter_connected = False
-            self.wavemeter_disabled = True
+            self._install_null_wavemeter(host, port, reason="disabled in settings.json")
+            return
+
+        # Cheap TCP smoke test first — open a socket, close it. If we can't
+        # even reach the port, don't bother constructing the real client.
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                pass
+        except Exception as e:
+            self._install_null_wavemeter(host, port, reason=f"TCP probe failed: {e}")
             return
 
         real = WavemeterClient(host=host, port=port, channel=self.wavechannel)
@@ -381,29 +394,34 @@ class DAQSystem:
             self.wavemeter_disabled = False
             return
         except Exception as e:
-            banner = (
-                "\n"
-                "╔══════════════════════════════════════════════════════════════╗\n"
-                "║                                                              ║\n"
-                "║   ⚠   WAVEMETER SERVER UNREACHABLE — TAGGER-ONLY MODE   ⚠    ║\n"
-                "║                                                              ║\n"
-                "║   The DAQ could not reach the wmServer at startup, so it     ║\n"
-                "║   has installed a stub wavemeter. The tagger and the rest    ║\n"
-                "║   of the GUI keep working; wavemeter readings will be 0.0    ║\n"
-                "║   and PID commands are silently dropped. Bring the server    ║\n"
-                "║   up and restart this app to recover real readings.          ║\n"
-                "║                                                              ║\n"
-                "╚══════════════════════════════════════════════════════════════╝\n"
-            )
-            print(banner)
-            print(f"[DAQ] wmServer probe error was: {e}")
             try:
                 real.close()
             except Exception:
                 pass
-            self.wavemeter = NullWavemeterClient(host=host, port=port, channel=self.wavechannel)
-            self.wavemeter_connected = False
-            self.wavemeter_disabled = True
+            self._install_null_wavemeter(host, port, reason=f"enable_read failed: {e}")
+
+    def _install_null_wavemeter(self, host: str, port: int, reason: str):
+        """Swap in a no-op wavemeter and print the operator-facing banner.
+        Shared by both the explicit-disable and probe-failure paths."""
+        banner = (
+            "\n"
+            "╔══════════════════════════════════════════════════════════════╗\n"
+            "║                                                              ║\n"
+            "║   ⚠   WAVEMETER SERVER UNREACHABLE — TAGGER-ONLY MODE   ⚠    ║\n"
+            "║                                                              ║\n"
+            "║   The DAQ could not reach the wmServer at startup, so it     ║\n"
+            "║   has installed a stub wavemeter. The tagger and the rest    ║\n"
+            "║   of the GUI keep working; wavemeter readings will be 0.0    ║\n"
+            "║   and PID commands are silently dropped. Bring the server    ║\n"
+            "║   up and restart this app to recover real readings.          ║\n"
+            "║                                                              ║\n"
+            "╚══════════════════════════════════════════════════════════════╝\n"
+        )
+        print(banner)
+        print(f"[DAQ] wmServer fallback reason: {reason}")
+        self.wavemeter = NullWavemeterClient(host=host, port=int(port or 0), channel=self.wavechannel)
+        self.wavemeter_connected = False
+        self.wavemeter_disabled = True
 
     def _maybe_flush_rate(self):
         """Emit one (t, rate) sample whenever the current integration window
