@@ -285,7 +285,7 @@ class DAQSystem:
                             }
                              self.saver.add_event(record)
 
-                if channel == 2:
+                if channel == 3:
                     self.events_processed += 1
                     self.event_timestamps.append(timestamp)
 

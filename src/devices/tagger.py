@@ -5,7 +5,7 @@ import pandas as pd
 import os
 
 this_path = os.path.abspath(__file__)
-father_path = "C:\\Users\\EMALAB\\Desktop\\TW_DAQ"
+father_path = "C:/Users/MITBeamBox_01/Desktop/SOFTWARE/Tagger/TW_DAQ"
 sys.path.append(father_path)
 try:
     from TimeTaggerDriver_isolde.timetagger4 import TimeTagger as tg
