@@ -92,6 +92,22 @@ restarts at t = 0.
 WavePort table the DAQ locks against. Default is `1` (the first port the
 server reports in its `GET` reply).
 
+#### Running tagger-only (no wavemeter server)
+
+For bringing up the tagger side of the rig before the wavemeter server
+is ready, set `wavemeter_server.enabled: false` in `settings.json`. The
+DAQ installs a stub wavemeter (readings return 0.0, PID commands are
+silently dropped) and the GUI's wavemeter row shows an orange
+**DISABLED** badge instead of red **DISCONNECTED**. The tagger, plots,
+and scan logic all keep working — only the `wavemeter_wn` column in any
+recorded CSV will be 0.
+
+If `enabled` is left at `true` but the server doesn't answer the
+startup probe, the DAQ logs a loud terminal banner and falls back to
+the same stub automatically — so the GUI never gets stuck spinning on a
+dead socket. Restart the app after the server is up to recover real
+readings.
+
 ### 5. PID parameters
 
 PID lives on the server, not in the DAQ. The GUI's *Laser Control* dialog

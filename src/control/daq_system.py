@@ -17,6 +17,7 @@ from src.control.scanner import Scanner
 # Real Hardware Imports
 from src.devices.tagger import Tagger
 from src.devices.wavemeter_client import WavemeterClient
+from src.devices.null_wavemeter import NullWavemeterClient
 
 
 class DAQSystem:
@@ -71,6 +72,14 @@ class DAQSystem:
         else:
             print("[DAQ] System Model: REAL HARDWARE")
 
+        # `wavemeter_disabled` is True iff we're running with a
+        # NullWavemeterClient (either by explicit settings.json knob or
+        # because the real server didn't answer the startup probe). The
+        # GUI uses this to paint the wavemeter row orange (DISABLED)
+        # rather than red (DISCONNECTED) so the operator can tell
+        # "no server by design" from "server is down".
+        self.wavemeter_disabled = False
+
         if simulation_mode:
             self.tagger = MockTagger(initialization_params=sim_config.get("tagger", {}))
             wm_sim = sim_config.get("wavemeter", {})
@@ -80,31 +89,13 @@ class DAQSystem:
                 noise_nm=float(wm_sim.get("noise_nm", 1e-7)),
                 initial_nm=float(wm_sim.get("initial_nm", 791.96)),
             )
+            # In simulation the mock client is always "connected".
+            self.wavemeter_connected = True
         else:
             print("Using real hardware")
             tagger_hw = hw_config.get("tagger", {})
             self.tagger = Tagger(index=0, initialization_params=tagger_hw)
-            self.wavemeter = WavemeterClient(
-                host=str(wm_block.get("host", "10.54.6.156")),
-                port=int(wm_block.get("port", 5000)),
-                channel=self.wavechannel,
-            )
-            # The wavemeter server boots with only channel 1 in active_read by
-            # default. Issue READ_ON for the configured channel so a fresh
-            # session is usable without manually flipping it in the dialog.
-            # Best-effort: a missing server here is loud-logged but not fatal —
-            # `wavemeter_connected` will flip false and the GUI will show that.
-            try:
-                self.wavemeter.enable_read()
-                self.wavemeter_connected = True
-            except Exception as e:
-                print(f"[DAQ] Could not enable read on channel {self.wavechannel}: {e}")
-                self.wavemeter_connected = False
-
-        # In simulation the mock client is always "connected". In real
-        # hardware the flag is updated by `_daq_loop` after every poll.
-        if simulation_mode:
-            self.wavemeter_connected = True
+            self._init_real_wavemeter(wm_block)
 
         self.laser = LaserController(self.wavemeter, channel=self.wavechannel, config=laser_cfg)
 
@@ -353,6 +344,67 @@ class DAQSystem:
         print("[DAQ] Laser settings updated.")
 
 
+    def _init_real_wavemeter(self, wm_block: dict):
+        """Set up `self.wavemeter` for a real-hardware run.
+
+        Three outcomes:
+          1. `wavemeter_server.enabled` is explicitly false → install a
+             NullWavemeterClient. Lets the operator bring up the tagger
+             side of the rig before the wmServer is online.
+          2. Real client constructs and the startup probe (`enable_read`)
+             succeeds → keep the real client, mark connected.
+          3. Real client constructs but the probe fails (server down,
+             unreachable, refusing connections) → log a loud banner and
+             fall back to NullWavemeterClient so the DAQ loop doesn't
+             stall on per-iteration socket timeouts. Restart once the
+             server is up to pick up real readings.
+        """
+        host = str(wm_block.get("host", "10.54.6.156"))
+        port = int(wm_block.get("port", 5000))
+        enabled = bool(wm_block.get("enabled", True))
+
+        if not enabled:
+            print(
+                "[DAQ] wavemeter_server.enabled=false — running with "
+                "NullWavemeterClient (no readings, PID commands no-op)."
+            )
+            self.wavemeter = NullWavemeterClient(host=host, port=port, channel=self.wavechannel)
+            self.wavemeter_connected = False
+            self.wavemeter_disabled = True
+            return
+
+        real = WavemeterClient(host=host, port=port, channel=self.wavechannel)
+        try:
+            real.enable_read()
+            self.wavemeter = real
+            self.wavemeter_connected = True
+            self.wavemeter_disabled = False
+            return
+        except Exception as e:
+            banner = (
+                "\n"
+                "╔══════════════════════════════════════════════════════════════╗\n"
+                "║                                                              ║\n"
+                "║   ⚠   WAVEMETER SERVER UNREACHABLE — TAGGER-ONLY MODE   ⚠    ║\n"
+                "║                                                              ║\n"
+                "║   The DAQ could not reach the wmServer at startup, so it     ║\n"
+                "║   has installed a stub wavemeter. The tagger and the rest    ║\n"
+                "║   of the GUI keep working; wavemeter readings will be 0.0    ║\n"
+                "║   and PID commands are silently dropped. Bring the server    ║\n"
+                "║   up and restart this app to recover real readings.          ║\n"
+                "║                                                              ║\n"
+                "╚══════════════════════════════════════════════════════════════╝\n"
+            )
+            print(banner)
+            print(f"[DAQ] wmServer probe error was: {e}")
+            try:
+                real.close()
+            except Exception:
+                pass
+            self.wavemeter = NullWavemeterClient(host=host, port=port, channel=self.wavechannel)
+            self.wavemeter_connected = False
+            self.wavemeter_disabled = True
+
     def _maybe_flush_rate(self):
         """Emit one (t, rate) sample whenever the current integration window
         has elapsed. Called from `_daq_loop`. The first iteration just
@@ -423,13 +475,27 @@ class DAQSystem:
 
     def get_wavemeter_status(self) -> dict:
         """One-shot snapshot of the wavemeter link for the GUI's status row.
-        `connected` is the result of the most recent poll attempt (or the
-        initial `enable_read` for the very first frame). `simulation` is
-        a fixed property of the DAQ instance."""
+
+        `mode` is one of:
+          - "sim"  — simulation mode (synthetic readings).
+          - "null" — real-hardware run with NullWavemeterClient installed
+                     (server disabled or unreachable at startup).
+          - "real" — real client; `connected` reflects the last poll.
+
+        `connected` is the result of the most recent poll attempt for the
+        real path; for sim it's always True; for null it's always False.
+        """
         wm = self.config.get("wavemeter_server", {})
+        if self.simulation_mode:
+            mode = "sim"
+        elif self.wavemeter_disabled:
+            mode = "null"
+        else:
+            mode = "real"
         return {
             "simulation": bool(self.simulation_mode),
             "connected": bool(self.wavemeter_connected),
+            "mode": mode,
             "host": wm.get("host", ""),
             "port": wm.get("port", ""),
             "channel": int(self.wavechannel),

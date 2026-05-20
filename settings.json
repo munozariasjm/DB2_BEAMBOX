@@ -30,6 +30,7 @@
         }
     },
     "wavemeter_server": {
+        "enabled": true,
         "host": "10.54.6.156",
         "port": 5000,
         "channel": 1,
@@ -61,5 +62,5 @@
             "continuous": false
         }
     },
-    "simulation_mode": true
+    "simulation_mode": false
 }

@@ -91,12 +91,27 @@ class StatusWidget(QWidget):
 
     def update_wavemeter_status(self, wm_status: dict):
         """Refresh the wavemeter link row from `DAQSystem.get_wavemeter_status()`.
-        Simulation gets its own colour (blue) so the operator never mistakes
-        a synthetic-data session for a healthy real one."""
-        if wm_status.get("simulation"):
+
+        Four colours, mapped from the `mode`/`connected` fields:
+          - blue   "SIMULATION"  — sim mode (synthetic readings).
+          - orange "DISABLED"    — real run with NullWavemeterClient (server
+                                   off by config or unreachable at startup).
+          - green  "host:port"   — real client, last poll succeeded.
+          - red    "DISCONNECTED"— real client, last poll failed.
+        """
+        mode = wm_status.get("mode")
+        if mode is None:
+            mode = "sim" if wm_status.get("simulation") else "real"
+
+        if mode == "sim":
             self.led_wm.set_color("#4a8fff")
             self.lbl_wm.setText("SIMULATION")
             self.lbl_wm.setStyleSheet("color: #4a8fff; font-weight: bold;")
+            return
+        if mode == "null":
+            self.led_wm.set_color("#e68a00")
+            self.lbl_wm.setText("DISABLED (tagger-only)")
+            self.lbl_wm.setStyleSheet("color: #e68a00; font-weight: bold;")
             return
         host = wm_status.get("host", "?")
         port = wm_status.get("port", "?")

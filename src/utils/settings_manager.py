@@ -39,8 +39,14 @@ class SettingsManager:
             }
         },
         # Network endpoint for LASERLABCOMPUTER/wmServer.py plus the lock-
-        # judgment knobs used by the LaserController polling loop.
+        # judgment knobs used by the LaserController polling loop. Set
+        # `enabled: false` to run in tagger-only mode without trying to
+        # reach the server — the DAQ installs a stub wavemeter (readings
+        # 0.0, PID commands dropped) and the status row shows DISABLED.
+        # Even when enabled, a failed startup probe falls back to the
+        # stub automatically, so the GUI never gets stuck on a dead link.
         "wavemeter_server": {
+            "enabled": True,
             "host": "10.54.6.156",
             "port": 5000,
             "channel": 1,
