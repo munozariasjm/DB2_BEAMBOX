@@ -1,6 +1,7 @@
 import time
 from collections import deque
-from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QSplitter, QLabel)
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
+                             QSplitter, QLabel, QScrollArea)
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtWidgets import QMessageBox
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -114,7 +115,20 @@ class MainWindow(QMainWindow):
 
         self.controls_layout.addStretch()
 
-        splitter.addWidget(self.controls_widget)
+        # Wrap the left column in a scroll area so the operator can reach
+        # widgets below the fold on short windows (or once the Plot Options
+        # collapsible is expanded). Vertical-only — the inner widget is
+        # made to resize horizontally to whatever width the splitter gives.
+        self.controls_scroll = QScrollArea()
+        self.controls_scroll.setWidget(self.controls_widget)
+        self.controls_scroll.setWidgetResizable(True)
+        self.controls_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.controls_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.controls_scroll.setFrameShape(QScrollArea.NoFrame)
+        # Keep the column from collapsing to nothing when the splitter is
+        # dragged hard left; just wide enough for the longest control row.
+        self.controls_scroll.setMinimumWidth(320)
+        splitter.addWidget(self.controls_scroll)
 
         self.plot_widget = PlotWidget()
         splitter.addWidget(self.plot_widget)

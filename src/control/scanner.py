@@ -2,6 +2,8 @@ import time
 import threading
 import numpy as np
 
+from src.utils.units import nm_vacuum_to_wn
+
 class Scanner(threading.Thread):
     def __init__(self, laser, wavemeter=None):
         super().__init__()
@@ -270,14 +272,31 @@ class Scanner(threading.Thread):
             remaining_bins = self.total_bins - self.bins_completed
             eta_seconds = remaining_bins * avg_per_bin
 
+        # One GET round-trip pulls both the live reading and the server's
+        # PID setpoint (in nm), so we can show a useful "Target" even when
+        # no scan is active — falling back to the held setpoint instead of
+        # 0.0 when scanner.current_wavenumber hasn't been driven yet.
         measured_wn = 0.0
+        setpoint_wn = 0.0
         if self.wavemeter:
-            wn_now = self.wavemeter.get_wavenumber()
-            if wn_now > 0:
-                measured_wn = wn_now
+            try:
+                status = self.wavemeter.get_status()
+                nm_reading = float(status.get("latest_reading", 0.0) or 0.0)
+                if nm_reading > 0:
+                    measured_wn = nm_vacuum_to_wn(nm_reading)
+                nm_setpoint = float(status.get("setpoint", 0.0) or 0.0)
+                if nm_setpoint > 0:
+                    setpoint_wn = nm_vacuum_to_wn(nm_setpoint)
+            except Exception:
+                # Server transient — keep the last-known zeros; the link
+                # LED in the status widget will surface the disconnect.
+                pass
+
+        target_wn = (self.current_wavenumber if self.current_wavenumber > 0
+                     else setpoint_wn)
 
         return {
-            "target_wn": self.current_wavenumber,
+            "target_wn": target_wn,
             "measured_wn": measured_wn,
             "stop_mode": self.stop_mode,
             "stop_value": self.stop_value,
