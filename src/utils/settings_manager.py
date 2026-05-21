@@ -22,7 +22,12 @@ class SettingsManager:
             # decoupled from refresh_rate_ms (which is purely UI repaint).
             "integration_time_s": 0.1,
             "rate_avg_enabled": False,
-            "rate_avg_window_s": 0.5
+            "rate_avg_window_s": 0.5,
+            # Status-widget readout unit for the Measured/Target wavemeter
+            # row. Display-only: scan settings, lock tolerance, and all
+            # internal math stay in cm⁻¹ regardless. "wn" → cm⁻¹, "nm" →
+            # nm vacuum (converted via wn_to_nm_vacuum at display time).
+            "wavemeter_display_unit": "wn"
         },
         "data_settings": {
             "default_save_dir": "data",

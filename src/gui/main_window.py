@@ -142,6 +142,9 @@ class MainWindow(QMainWindow):
         self.rate_avg_enabled = bool(gui_settings.get("rate_avg_enabled", False))
         self.daq.set_integration_time(float(gui_settings.get("integration_time_s", 0.1)))
         self.plot_widget.set_rate_avg_enabled(self.rate_avg_enabled)
+        self.status_widget.set_display_unit(
+            gui_settings.get("wavemeter_display_unit", "wn")
+        )
 
         self.actions_widget.start_requested.connect(self.on_start)
         self.actions_widget.pause_requested.connect(self.on_pause)

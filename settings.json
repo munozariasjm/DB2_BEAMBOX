@@ -15,7 +15,8 @@
         "refresh_rate_ms": 100,
         "integration_time_s": 0.1,
         "rate_avg_enabled": false,
-        "rate_avg_window_s": 0.5
+        "rate_avg_window_s": 0.5,
+        "wavemeter_display_unit": "wn"
     },
     "data_settings": {
         "default_save_dir": "data",
@@ -34,9 +35,9 @@
         "enabled": true,
         "host": "10.54.6.156",
         "port": 5000,
-        "channel": 1,
+        "channel": 6,
         "tolerance_wn": 1e-5,
-        "poll_interval": 0.1,
+        "poll_interval": 0.5,
         "required_stable_samples": 4,
         "wm_averaging_samples": 5
     },

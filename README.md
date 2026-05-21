@@ -118,6 +118,11 @@ the client translates to wavePort 0 on the wire. To target wavePort 2
 (say, the laser on port index 2 in the server's defaults dict), set
 `channel: 3`.
 
+`gui_settings.wavemeter_display_unit` flips the status panel's Measured /
+Target readout between `"wn"` (cm⁻¹, default) and `"nm"` (nm vacuum).
+Display-only — scan settings, lock tolerance, and all internal math stay
+in cm⁻¹. Reload the app to switch.
+
 #### Running tagger-only (no wavemeter server)
 
 For bringing up the tagger side of the rig before the wavemeter server

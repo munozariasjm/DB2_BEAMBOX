@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QGroupBox, QLabel,
 from PyQt5.QtGui import QPainter, QColor, QBrush
 from PyQt5.QtCore import Qt, QSize
 
+from src.utils.units import wn_to_nm_vacuum
+
 class LEDIndicator(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,7 +26,23 @@ class LEDIndicator(QWidget):
 class StatusWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        # Display unit for the "Measured/Target" readout. Internal math
+        # stays in cm⁻¹ regardless — only this label flips. Set via
+        # `set_display_unit("wn"|"nm")` from MainWindow at startup; toggled
+        # by the gui_settings.wavemeter_display_unit setting.
+        self._display_unit = "wn"
         self.init_ui()
+
+    def set_display_unit(self, unit: str):
+        unit = (unit or "wn").lower()
+        if unit not in ("wn", "nm"):
+            unit = "wn"
+        self._display_unit = unit
+        if hasattr(self, "lbl_status_wn"):
+            label = "nm" if unit == "nm" else "cm^-1"
+            self.lbl_status_wn.setText(
+                f"Measured: -- {label}\nTarget: -- {label}"
+            )
 
     def init_ui(self):
         layout = QVBoxLayout(self)
@@ -129,7 +147,18 @@ class StatusWidget(QWidget):
         target_wn = daq_status['target_wn']
         measured_wn = daq_status['measured_wn']
 
-        self.lbl_status_wn.setText(f"Measured: {measured_wn:.6f} cm^-1\nTarget: {target_wn:.6f} cm^-1")
+        if self._display_unit == "nm":
+            # Convert only for display. `wn_to_nm_vacuum(0)` would blow up
+            # so guard the zero/idle case (target_wn=0 when no scan).
+            meas_disp = wn_to_nm_vacuum(measured_wn) if measured_wn > 0 else 0.0
+            tgt_disp = wn_to_nm_vacuum(target_wn) if target_wn > 0 else 0.0
+            self.lbl_status_wn.setText(
+                f"Measured: {meas_disp:.6f} nm\nTarget: {tgt_disp:.6f} nm"
+            )
+        else:
+            self.lbl_status_wn.setText(
+                f"Measured: {measured_wn:.6f} cm^-1\nTarget: {target_wn:.6f} cm^-1"
+            )
 
         if active_params_text:
              self.lbl_scan_info.setToolTip(active_params_text)
