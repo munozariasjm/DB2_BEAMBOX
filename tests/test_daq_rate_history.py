@@ -19,7 +19,7 @@ import pytest
 from src.control.daq_system import DAQSystem
 
 
-def _sim_config(integration_time_s=0.05, repetition_rate=200.0):
+def _sim_config(integration_time_s=0.05, repetition_rate=200.0, detector_channel=2):
     return {
         "simulation_mode": True,
         "gui_settings": {
@@ -29,7 +29,8 @@ def _sim_config(integration_time_s=0.05, repetition_rate=200.0):
         "scan_settings": {"start_wn": 12624.9, "end_wn": 12624.9, "step_size": 1e-6,
                           "stop_mode": "time", "stop_val": 1.0, "loops": 1},
         "data_settings": {"default_save_dir": "data", "auto_save": False},
-        "hardware_settings": {"tagger": {"input_mode": "TTL"}},
+        "hardware_settings": {"tagger": {"input_mode": "TTL",
+                                          "detector_channel": detector_channel}},
         "wavemeter_server": {"host": "127.0.0.1", "port": 5000, "channel": 1,
                               "tolerance_wn": 1e-5, "poll_interval": 0.1,
                               "required_stable_samples": 4,
@@ -115,6 +116,39 @@ def test_clear_rate_history_resets_clock(daq_factory):
     times, _ = daq.get_rate_history()
     assert len(times) > 0
     assert times[0] < 0.5, f"first sample after clear is at t={times[0]}"
+
+
+def test_rate_value_is_nonzero_on_configured_detector_channel(daq_factory):
+    """Regression for the hardcoded channel filter: when the loop only
+    accepted a hard-coded channel (3) but the sim emits on channel 2,
+    every rate sample came out as 0.0 — broken plot, silent. The detector
+    channel is now a config knob (default 2) that matches MockTagger, so
+    the median rate must be clearly non-zero.
+
+    Note on expected value: the loop counts each bunch twice (once via
+    the channel==-1 trigger entry, once via the first detector hit's
+    `entry[0] != previous_bunch` check), so for sim's mean_events_per_bunch
+    of 10 the rate hovers near 5, not 10. Bounds are wide because the only
+    thing this test guards against is "filter is broken → rate is 0"."""
+    daq = daq_factory(integration_time_s=0.2, repetition_rate=500.0)
+    time.sleep(1.5)
+    _, rates = daq.get_rate_history()
+    assert len(rates) >= 3, f"only {len(rates)} samples"
+    median = sorted(rates)[len(rates) // 2]
+    assert 2.0 < median < 10.0, f"median rate {median} — filter likely broken"
+
+
+def test_detector_channel_knob_filters_other_channels(daq_factory):
+    """Pointing detector_channel at an input the sim does not emit on (3)
+    must produce all-zero rate samples — proves the config knob is wired
+    end-to-end and that hits on other inputs are correctly ignored."""
+    daq = daq_factory(integration_time_s=0.1, repetition_rate=500.0,
+                      detector_channel=3)
+    time.sleep(0.6)
+    _, rates = daq.get_rate_history()
+    assert len(rates) >= 2, f"only {len(rates)} samples"
+    assert all(r == 0.0 for r in rates), \
+        f"expected all-zero rates with detector_channel=3, got {rates}"
 
 
 def test_first_sample_not_a_startup_spike(daq_factory):

@@ -87,7 +87,11 @@ def test_wavemeter_explicitly_disabled_installs_null_client():
 
 
 def test_unreachable_server_falls_back_to_null_client(monkeypatch):
-    """Probe (`enable_read`) raises → DAQ swaps to NullWavemeterClient."""
+    """Probe (`ping`) raises → DAQ swaps to NullWavemeterClient.
+
+    Under the new JSON protocol the probe is a GET round-trip (the only
+    verb the server replies to). enable_read is fire-and-forget and can no
+    longer surface errors, so the smoke-test moved to ping()."""
 
     class _RaisingClient:
         def __init__(self, host, port, channel=1, timeout=2.0):
@@ -95,8 +99,11 @@ def test_unreachable_server_falls_back_to_null_client(monkeypatch):
             self.port = port
             self.channel = channel
 
-        def enable_read(self, channel=None):
+        def ping(self):
             raise RuntimeError("wmServer unreachable (synthetic)")
+
+        def enable_read(self, channel=None):
+            pass
 
         def close(self):
             pass
@@ -124,6 +131,9 @@ def test_real_client_kept_when_probe_succeeds(monkeypatch):
             self.host = host
             self.port = port
             self.channel = channel
+
+        def ping(self):
+            return None
 
         def enable_read(self, channel=None):
             return None

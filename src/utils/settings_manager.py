@@ -35,16 +35,22 @@ class SettingsManager:
             "tagger": {
                 "input_mode": "TTL",
                 "channel_starts_us": 1.0,
-                "channel_stops_us": 10.0
+                "channel_stops_us": 10.0,
+                # Which TimeTagger4 input the detector is wired to. Hits
+                # on any other input are ignored. The trigger arrives as
+                # channel == -1 (synthetic empty-bunch marker) regardless.
+                "detector_channel": 2
             }
         },
-        # Network endpoint for LASERLABCOMPUTER/wmServer.py plus the lock-
-        # judgment knobs used by the LaserController polling loop. Set
-        # `enabled: false` to run in tagger-only mode without trying to
-        # reach the server — the DAQ installs a stub wavemeter (readings
-        # 0.0, PID commands dropped) and the status row shows DISABLED.
-        # Even when enabled, a failed startup probe falls back to the
-        # stub automatically, so the GUI never gets stuck on a dead link.
+        # Network endpoint for LASERLABCOMPUTER/new_wmServer.py plus the
+        # lock-judgment knobs used by the LaserController polling loop.
+        # `channel` is 1-indexed (legacy convention); the client translates
+        # to the server's 0-indexed wavePort key. Set `enabled: false` to
+        # run in tagger-only mode without trying to reach the server — the
+        # DAQ installs a stub wavemeter (readings 0.0, PID commands dropped)
+        # and the status row shows DISABLED. Even when enabled, a failed
+        # startup probe (GET round-trip) falls back to the stub
+        # automatically, so the GUI never gets stuck on a dead link.
         "wavemeter_server": {
             "enabled": True,
             "host": "10.54.6.156",

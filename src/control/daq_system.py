@@ -81,6 +81,17 @@ class DAQSystem:
         # "no server by design" from "server is down".
         self.wavemeter_disabled = False
 
+        # Which TimeTagger4 input the detector is wired to. Configurable
+        # so that re-wiring (or moving the detector between inputs while
+        # debugging) is a one-line settings change instead of a code edit.
+        # Default 2 matches our current rig and the MockTagger, which also
+        # emits hits on channel 2. The trigger always comes through as
+        # channel == -1 (a synthetic empty-bunch marker) regardless of the
+        # detector channel.
+        self.detector_channel = int(
+            hw_config.get("tagger", {}).get("detector_channel", 2)
+        )
+
         if simulation_mode:
             self.tagger = MockTagger(initialization_params=sim_config.get("tagger", {}))
             wm_sim = sim_config.get("wavemeter", {})
@@ -285,7 +296,14 @@ class DAQSystem:
                             }
                              self.saver.add_event(record)
 
-                if channel == 3:
+                # Detector hits arrive on `self.detector_channel` (set
+                # from hardware_settings.tagger.detector_channel, default
+                # 2). A previous "switch channel" commit hard-coded this
+                # to 3 and silently dropped every real hit; making it a
+                # config knob keeps the next re-wiring from doing the same.
+                # Empty-bunch triggers (channel == -1) are handled above;
+                # entries on other inputs are ignored.
+                if channel == self.detector_channel:
                     self.events_processed += 1
                     self.event_timestamps.append(timestamp)
 
@@ -388,6 +406,13 @@ class DAQSystem:
 
         real = WavemeterClient(host=host, port=port, channel=self.wavechannel)
         try:
+            # GET is the only verb the new server replies to, so it's the
+            # only thing that can verify the server is alive at startup
+            # (SET is fire-and-forget under the JSON protocol). Then push
+            # `active_read=true` for our channel best-effort — if the
+            # server didn't have read enabled for this port, this turns
+            # it on; if it did, no-op. We don't see SET errors either way.
+            real.ping()
             real.enable_read()
             self.wavemeter = real
             self.wavemeter_connected = True
@@ -398,7 +423,7 @@ class DAQSystem:
                 real.close()
             except Exception:
                 pass
-            self._install_null_wavemeter(host, port, reason=f"enable_read failed: {e}")
+            self._install_null_wavemeter(host, port, reason=f"server probe failed: {e}")
 
     def _install_null_wavemeter(self, host: str, port: int, reason: str):
         """Swap in a no-op wavemeter and print the operator-facing banner.

@@ -156,13 +156,25 @@ class LaserController:
 
     def update_pid_config(self, pid_config: dict):
         """Push PID parameters (kp/ki/kd/vLow/vHigh/gain/offset) to the server.
-        Unknown keys are ignored with a warning rather than raising — the GUI
-        may pass through dict entries that aren't PID-related."""
-        for key, value in pid_config.items():
-            if key not in _PID_KEYS:
-                continue
+        Unknown keys are dropped silently — the GUI may pass through dict
+        entries that aren't PID-related. All known keys are sent in a SINGLE
+        SET so the server's recv loop sees one JSON object, not N
+        back-to-back ones (the new server's per-recv json.loads otherwise
+        chokes and drops the connection)."""
+        batch = {k: float(v) for k, v in pid_config.items() if k in _PID_KEYS}
+        if not batch:
+            return
+        if hasattr(self.client, "set_params"):
             try:
-                self.client.set_pid_param(key, float(value), channel=self.channel)
+                self.client.set_params(batch, channel=self.channel)
+            except Exception as e:
+                print(f"[Laser] failed to push PID batch: {e}")
+            return
+        # Fallback for clients without the batch API (the mock and the null
+        # stub mirror set_pid_param but not set_params).
+        for key, value in batch.items():
+            try:
+                self.client.set_pid_param(key, value, channel=self.channel)
             except Exception as e:
                 print(f"[Laser] failed to push {key}={value}: {e}")
 
